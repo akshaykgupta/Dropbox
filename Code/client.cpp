@@ -7,6 +7,7 @@
 #include <arpa/inet.h>
 #include <unistd.h> 
 #include <iostream>
+#include <netdb.h>
 
 using namespace std;
 
