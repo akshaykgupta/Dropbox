@@ -1,71 +1,158 @@
-#include <stdio.h> 
-#include <stdlib.h>
-#include <sys/types.h> 
-#include <sys/socket.h>  
-#include <string.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <unistd.h> 
-#include <iostream>
-
-using namespace std;
-
-#define BUF_SIZE 2000
+#include "server.h"
 
 
-class Server{
-private:
-	sockaddr_in addr, cl_addr;
+void Server::sendFilename(char* fName, int sd)
+{
+	int n, byteswritten=0 , written;
 
-	void SendData(int, char* );
-	void ReceiveData(int , char* );	
+	char buffer[1024];
+	strcpy(buffer , fName);
+	n=strlen(buffer);
+	while (byteswritten < n)
+	{
+		written=write(sd , buffer+byteswritten,(n-byteswritten));
+		byteswritten+=written;
+	}
 
-public:
-
-	void ChildProcess(int, int); // Handle a client when a connection is made
-	void CreateServer(char*, int); // main 	
-
-
-};
-
-
-/* * * * * * * * * * * * * * * * * * * * * * * * * * */
-
-void Server::ReceiveData(int newsockfd, char* buffer){
-	int ret;
-	int len = sizeof(cl_addr);
-	ret = recvfrom(newsockfd, buffer, BUF_SIZE, 0, (struct sockaddr *) &cl_addr, (socklen_t*) &len);  
-  	if(ret < 0) {  
-   			printf("Error receiving data!\n");    
-   			exit(1);  
- 	}
+	printf("File name : %s sent to server \n",buffer);
 }
 
-
-void Server::SendData(int newsockfd, char* buffer){
-	int ret;
-	int len = sizeof(cl_addr);
-	ret = sendto(newsockfd, buffer, BUF_SIZE, 0, (struct sockaddr *) &cl_addr, len);     
- 	if (ret < 0) {    
-   		printf("Error sending data!\n");    
-   		exit(1);    
- 	}
-
-}
-
-/* * * * * * * * * * * * * * * * * * * * * * * * * * */
-
-void Server::ChildProcess(int sockfd, int newsockfd){
-	close(sockfd);     // stop listening for new connections. handle only the current connection
+void Server::fileTransfer(int fd, int sockfd)
+{
+	int BUF_SIZE = 1024;
 	char buffer[BUF_SIZE];
- 	while (true){ 
-		memset(buffer, 0, BUF_SIZE);  
-		ReceiveData(newsockfd, buffer);
-		SendData(newsockfd, buffer);  
- 	}  
+	int bytesread;
+	do
+	{
+		bytesread = read(fd, buffer, BUF_SIZE);
+		int ret = write(sockfd, buffer, BUF_SIZE);    
+		if (ret < 0) {    
+			printf("Error sending data!\n\t-%s", buffer);  
+			exit(1);  
+		}  
+	}
+	while (bytesread != 0);
+
 }
 
-/* * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+void Server::readData(int newsockfd)
+{
+
+	int BUF_SIZE = 1024;
+
+	char buffer[BUF_SIZE];
+	ofstream f;
+	int rv;
+	char name;
+	int bytesread;
+	stringstream fileName;
+
+	while ((bytesread = read(newsockfd, &name, sizeof(name) )) != 0)
+	{
+		if (name == '\0') break;
+		fileName << name;
+
+	}
+
+
+	f.open(fileName.str(),ios::out);
+
+	while ((rv = read(newsockfd, buffer, BUF_SIZE) ) != 0)   
+		f.write(buffer, BUF_SIZE);
+	
+
+	f.close();
+	
+}
+
+
+void Server::ReceiveData(int newsockfd){
+
+	bool interrupt = false;
+	int r, rv;
+
+	pollfd pf;
+	pf.fd = newsockfd;
+	pf.events = POLLIN;
+
+
+	do{
+
+	rv = poll(&pf, 1, -1);
+	if (rv == -1)
+		perror("poll"); // error occurred in poll()
+
+	if (pf.revents && POLLIN)
+		readData(newsockfd);
+
+
+
+		printf("%s\n", "Press 1 to continue receiving files");
+		scanf("%d",&r);
+		if (r == 1) interrupt = true;
+
+	} while (!interrupt);
+
+
+
+}
+
+
+void Server::SendData(int sockfd, char* a)
+{
+
+	int fd = open(a, O_RDONLY);
+	if (fd < 0)
+	{
+		printf("%s\n","File IO error");
+		exit(1);
+	}
+
+	sendFilename(a, sockfd);
+	char b = '\0';
+	int n = write(sockfd, &b, sizeof(b));
+	fileTransfer(fd, sockfd);
+
+	close(fd);
+
+
+}
+
+
+
+void Server::ChildProcess(int sockfd, int newsockfd)
+{
+	close(sockfd);    
+	char* a;
+	int opt = 0;
+ 	while (true){
+ 		printf("%s\n","press 1 to send file");
+ 		printf("%s\n","press 2 to receive files");
+
+ 		while (opt != 0) scanf("%d",&opt);
+
+ 		if (opt == 1)
+ 		{
+ 			printf("%s\n", "Enter file name to send");
+ 			scanf("%s",a);
+ 			SendData(newsockfd,a);
+ 		}	
+ 		
+ 		if (opt == 2)
+ 		{
+ 			printf("%s\n","Receiving Data from client..");
+ 			ReceiveData(newsockfd);
+ 		}
+
+
+ 	}
+
+
+ 	 
+}
+
+
 
 void Server::CreateServer(char* a, int port)
 {
@@ -109,4 +196,4 @@ void Server::CreateServer(char* a, int port)
 		}   
 }
 
-/* * * * * * * * * * * * * * * * * * * * * * * * * * */
+
