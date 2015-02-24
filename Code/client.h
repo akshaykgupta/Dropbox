@@ -34,6 +34,7 @@ private:
 	void fileTransfer(int);
 	void readData();
 
+
 public:
 
 	
@@ -46,9 +47,9 @@ public:
 	void connectToServer(char* serverAddr,int);
 	
 	void readFromServer();
-	void writeToServer(char* );
-
-
+	void writeToServer(char* );  // file Name
+	void writeCommand(char *); // write a char* to the server
+ 
 
 };
 

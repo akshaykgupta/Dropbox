@@ -36,19 +36,64 @@ void Server::fileTransfer(int fd, int sockfd)
 }
 
 
+string Server::readCommand(int newsockfd)
+{
+	char name;
+	int r;
+	string s = "";
+	while (r = read(newsockfd, &name, sizeof(name)) != 0)
+	{
+		if (name == '\0') break;
+		s+= name;
+	}
+
+	return s;
+}
+
+
+void Server::uploadData(int newsockfd)
+{
+	ofstream f;
+
+	int BUF_SIZE = 1024;
+	int rv;
+
+	char buffer[BUF_SIZE];
+	string s = fileName(newsockfd);
+	f.open(s, ios::out);
+	while ((rv = read(newsockfd, buffer, BUF_SIZE)) != 0)
+		f.write(buffer, BUF_SIZE);
+
+	f.close();
+
+	// Handle version control, and change user info
+
+
+}
+
+
+string Server::fileName(int newsockfd)
+{
+	return readCommand(newsockfd);
+}
+
 void Server::readData(int newsockfd)
 {
 
-	int BUF_SIZE = 1024;
+	string command = readCommand(newsockfd);
+	if (command == DOWNLOAD)
+		downloadData(newsockfd);
+	
 
-	char buffer[BUF_SIZE];
-	ofstream f;
-	int rv;
-	char name;
-	int bytesread;
-	stringstream fileName;
 
-	while ((bytesread = read(newsockfd, &name, sizeof(name) )) != 0)
+	if (command == SHARE)
+		shareData(newsockfd);
+
+
+	if (command == UPLOAD)
+		uploadData(newsockfd);
+	
+/*	while ((bytesread = read(newsockfd, &name, sizeof(name) )) != 0)
 	{
 		if (name == '\0') break;
 		fileName << name;
@@ -62,7 +107,7 @@ void Server::readData(int newsockfd)
 		f.write(buffer, BUF_SIZE);
 	
 
-	f.close();
+	f.close();*/
 	
 }
 
@@ -194,6 +239,43 @@ void Server::CreateServer(char* a, int port)
 
 			 close(newsockfd);
 		}   
+}
+
+void server::populate(User& u, const char* path)
+{
+	dir = opendir(path);
+
+}
+
+void server::buildSets() {
+    dirent *userEntry;
+    DIR *dir;
+    if ((dir = opendir(".") ) != NULL)     // system call to open directory
+	{
+		while ((userEntry = readdir (dir)) != NULL)   //system call to read file name from directory
+		{
+			//printf("\n%s",entry->d_name);
+			if(userEntry.d_type == DT_DIR)
+			{
+				string dirName(userEntry.d_name);
+				UserInfo i;
+				i.username = dirName;
+				//TODO set password
+				User u;
+				u.info = i;
+				dirent *files;
+				DIR *userDir;
+				char path[256];
+				strcat(path, "./");
+				strcat(path, userEntry.d_name);
+				populate(u, path);
+			}
+		}
+	}
+	else
+	{
+		cout << "Could not open directory.\n";
+	}
 }
 
 

@@ -2,29 +2,6 @@
 
 
 
-void Client::sendFilename(char* fName){
-
-	if (!connected) {
-		printf("%s\n","not connected to server");
-		exit(1);
-	}
-
-
-	int n,  written;
-
-	char buffer[1024];
-	strcpy(buffer , fName);
-	n=strlen(buffer);
-
-	written=write(sockfd , buffer,n);
-	if (written < 0){
-		printf("%s\n", "Error sending file name");
-		exit(1);
-	}
-
-	printf("File name : %s sent to server \n",buffer);
-}
-
 
 
 
@@ -172,7 +149,8 @@ void Client::writeToServer(char* a){
 		exit(1);
 	}
 
-	sendFilename(a);
+	
+	writeCommand(a);
 	char b = '\0';
 	int n = write(sockfd, &b, sizeof(b));
 	fileTransfer(fd);
@@ -182,6 +160,24 @@ void Client::writeToServer(char* a){
 }
 
 
+
+void Client::writeCommand(char* a)
+{
+	if (!connected) {
+		printf("%s\n","not connected to server");
+		exit(1);
+	}
+
+	int n = strlen(a);
+	int written = write(sockfd, a, n);
+	if (written < 0)
+	{
+		printf("%s\n","Problem sending command");
+		exit(1);
+	}
+
+	printf("%s\n", "command sent");
+}
 
 
 
