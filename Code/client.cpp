@@ -19,7 +19,7 @@ void Client::fileTransfer(int fd){
 	{
 		bytesread = read(fd, buffer, BUF_SIZE);
 		ret = write(sockfd, buffer, BUF_SIZE);
-		if (ret < 0) {    
+		if (ret < 0) { 
 			printf("Error sending data!\n\t-%s", buffer);  
 			exit(1);  
 		}  
@@ -82,7 +82,7 @@ string readCommandFromServer()
 		if (pf.revents && POLLIN){
 
 		while ((bytesread = read(sockfd, &b,sizeof(b))) != 0){
-				if (b == '\0') break;
+				if (b == DELIMITER) break;
 				command << b;
 			}
 			return command.str();
@@ -109,27 +109,12 @@ void Client::readFromServer()
 	pollfd pf;
 	pf.fd = sockfd;
 	pf.events = POLLIN;
+	rv = poll(&pf, 1, -1);
+	if (rv == -1)
+		perror("poll"); // error occurred in poll()
 
-
-	do{
-
-		rv = poll(&pf, 1, -1);
-		if (rv == -1)
-			perror("poll"); // error occurred in poll()
-
-		if (pf.revents && POLLIN)
-			readFile();
-
-
-
-		printf("%s\n", "Press 1 to continue receiving files");
-		scanf("%d", &r);
-		if (r == 1) interrupt = true;
-
-	} 
-	while (!interrupt);
-
-
+	if (pf.revents && POLLIN)
+		readFile();
 
 }
 
@@ -179,7 +164,7 @@ void Client::writeToServer(char* a){
 
 	
 	writeCommand(a);
-	char b = '\0';
+	char b = DELIMITER;
 	int n = write(sockfd, &b, sizeof(b));
 	fileTransfer(fd);
 
@@ -203,7 +188,7 @@ void Client::writeCommand(char* a)
 		printf("%s\n","Problem sending command");
 		exit(1);
 	}
-	char b = '\0';
+	char b = DELIMITER;
 	int n = write(sockfd, &b, sizeof(b));
 	printf("%s\n", "command sent");
 }

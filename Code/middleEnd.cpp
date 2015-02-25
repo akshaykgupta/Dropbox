@@ -1,7 +1,11 @@
 #include "middleEnd.h"
 
-void middleEnd::register(User& u, Client& c)
+bool middleEnd::Register(Client& c, string& username, string& password)
 {
+	c.writeCommand("register");
+	c.writeCommand(username);
+	c.writeCommand(password);
+	return c.verifyUser("Successful");
 
 }
 
@@ -11,32 +15,29 @@ bool middleEnd::login(Client& c, string& username, string& password)
 {
 	c.writeCommand("login");
 	c.writeCommand(username);
+
 	c.writeCommand(password);
-	//bool valid;
-	/*
-	valid = c.verifyUser();
-	*/
-	return c.verifyUser();
+	return c.verifyUser("Valid");
 }
 
 
-void middleEnd::download(User& u, Client& c, char* fileName)
+void middleEnd::download(string& username, Client& c, string& fileName)
 {
-	if (!c.checkIfAllowed(u, fileName))
+	c.writeCommand("download");
+	
+	if (!c.checkIfAllowed(username, fileName))
 	{
 		printf("%s\n", "Permission Denied");
 		exit(1);
 	}
 
-	c.writeCommand("download");
-	c.writeCommand(fileName);
 	c.readFromServer();
 
 	// make changes to u?
 }
 
 
-void middleEnd::upload(User& u, Client& c, char* fileName)
+void middleEnd::upload(Client& c, string& fileName)
 {
 	c.writeCommand("upload");
 	c.writeToServer(fileName);
@@ -44,23 +45,20 @@ void middleEnd::upload(User& u, Client& c, char* fileName)
 }
 
 
-void middleEnd::share(User& uA, User& uB, Client& c, char* fileName)
+void middleEnd::share(Client& c, string& fileName, string& uA, string& uB)
 {
 	
 	c.writeCommand("share");
-	c.sendUserInfo(uA);
-	c.sendUserInfo(uB);
-	c.fileName(fileName);
+	c.writeCommand(uA);
+	c.writeCommand(uB);
+	c.writeCommand(fileName);
 	/* share file between user a and user b */
 }
 
-void middleEnd::delete(User& u,Client& c, char* fileName)
+void middleEnd::Delete(Client& c, string& fileName)
 {
-	if (!u.hasFile())
-	{
-		printf("%s\n","File not found");
-		exit(1);
-	}
+	c.writeCommand("delete");
+	c.writeCommand(fileName);
 
 	/* delete file from client c */
 }

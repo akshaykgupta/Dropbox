@@ -29,12 +29,13 @@ using namespace std;
 #define SHARE "share"
 #define REGISTER "register"
 #define LOGIN "login"
+#define DELETE "delete"
 #define DELIMITER '\0'
 
 class Server{
 private:
 
-	set<User* > Users;
+	//set<User* > Users;
 	sockaddr_in addr, cl_addr;
 	/* Do unit testing */
 	void sendFilename(char* fName, int sd);

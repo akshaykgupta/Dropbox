@@ -43,7 +43,7 @@ string Server::readCommand(int newsockfd)
 	string s = "";
 	while (r = read(newsockfd, &name, sizeof(name)) != 0)
 	{
-		if (name == '\0') break;
+		if (name == DELIMITER) break;
 		s+= name;
 	}
 
@@ -95,7 +95,7 @@ void Server::readData(int newsockfd)
 	
 /*	while ((bytesread = read(newsockfd, &name, sizeof(name) )) != 0)
 	{
-		if (name == '\0') break;
+		if (name == DELIMITER) break;
 		fileName << name;
 
 	}
@@ -155,7 +155,7 @@ void Server::SendData(int sockfd, char* a)
 	}
 
 	sendFilename(a, sockfd);
-	char b = '\0';
+	char b = DELIMITER;
 	int n = write(sockfd, &b, sizeof(b));
 	fileTransfer(fd, sockfd);
 

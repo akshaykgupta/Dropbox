@@ -19,7 +19,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>  
 
-
+#define DELIMITER '\0'
 using namespace std;
 
 
@@ -52,6 +52,7 @@ public:
 	void writeCommand(char *); // write a char* to the server
  	bool verifyUser(); // TODO
  	void readCommandFromServer();
+ 	bool checkIfAllowed(string&, string&);
 };
 
 #endif
