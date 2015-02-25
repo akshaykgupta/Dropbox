@@ -13,16 +13,17 @@
 
 class middleEnd{
 private:
-	
-public:
-	
+	//static const int dataBaseId;
 
-	void register();
-	void login();
-	void download(Client& , char*);
-	void upload(Client&, char*);
-	void share(Client&, char*);
-	void delete(Client&, char*);
+
+public:
+
+	void register(User&, Client&); // register a new User u
+	bool login(Client&, string&, string&);  // login? for the current user
+	void download(User&, Client& , char*); // download given file for the given user
+	void upload(User&, Client&, char*); // upload current file for the given user
+	void share(User&, User&, Client&, char*); // share current file between the 2 users
+	void delete(User&, Client&, char*); // delete current file from the user's database
 
 };
 

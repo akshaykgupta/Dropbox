@@ -32,7 +32,8 @@ private:
 	bool exec, connected;
 	void sendFilename(char*);
 	void fileTransfer(int);
-	void readData();
+	void readFile();
+
 
 
 public:
@@ -49,8 +50,8 @@ public:
 	void readFromServer();
 	void writeToServer(char* );  // file Name
 	void writeCommand(char *); // write a char* to the server
- 
-
+ 	bool verifyUser(); // TODO
+ 	void readCommandFromServer();
 };
 
 #endif

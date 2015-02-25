@@ -18,15 +18,23 @@
 #include <fcntl.h>  
 #include <sys/poll.h>
 #include <fstream>
+#include <dirent.h> 
+#include <set>
 
 
 using namespace std;
 
-
-
+#define UPLOAD "upload"
+#define DOWNLOAD "download"
+#define SHARE "share"
+#define REGISTER "register"
+#define LOGIN "login"
+#define DELIMITER '\0'
 
 class Server{
 private:
+
+	set<User* > Users;
 	sockaddr_in addr, cl_addr;
 	/* Do unit testing */
 	void sendFilename(char* fName, int sd);
@@ -36,6 +44,8 @@ private:
 
 	void SendData(int, char* );
 	void ReceiveData(int);	
+	void buildSets();//
+	void populate(User&, const char*);//
 
 public:
 

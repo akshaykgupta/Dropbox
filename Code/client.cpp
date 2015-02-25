@@ -29,7 +29,7 @@ void Client::fileTransfer(int fd){
 }
 
 
-void Client::readData(){
+void Client::readFile(){
 
 
 	if (!connected) {
@@ -40,22 +40,13 @@ void Client::readData(){
 
 	int BUF_SIZE = 1024;
 	int rv;
-	int bytesread;
+
 
 	char buffer[BUF_SIZE];
 	fstream file;
-	char name;
-	stringstream fileName;
+	string fileName = readCommandFromServer();
 
-	while ((bytesread = read(sockfd, &name, sizeof(name) )) != 0)
-	{
-		if (name == '\0') break;
-		fileName << name;
-
-	}
-
-
-	file.open(fileName.str(),ios::out);
+	file.open(fileName,ios::out);
 
 	while ((rv = read(sockfd, buffer, BUF_SIZE) ) != 0)   
 		file<<buffer;
@@ -64,7 +55,44 @@ void Client::readData(){
 }
 
 
+string readCommandFromServer()
+{
+	if (!connected)
+	{
+		printf("%s\n","not connected to server");
+		exit(1);
+	}
 
+	pollfd pf;
+	pf.fd = sockfd;
+	pf.events = POLLIN;
+
+
+
+	int bytesread;
+	char b;
+	int rv;
+	stringstream command;
+
+
+	while (true){
+
+		rv = poll(&pf, 1,-1);
+		if (rv == -1) perror("poll");
+		if (pf.revents && POLLIN){
+
+		while ((bytesread = read(sockfd, &b,sizeof(b))) != 0){
+				if (b == '\0') break;
+				command << b;
+			}
+			return command.str();
+		
+		}
+
+	
+	}
+
+}
 
 
 void Client::readFromServer()
@@ -90,7 +118,7 @@ void Client::readFromServer()
 			perror("poll"); // error occurred in poll()
 
 		if (pf.revents && POLLIN)
-			readData();
+			readFile();
 
 
 
@@ -175,13 +203,25 @@ void Client::writeCommand(char* a)
 		printf("%s\n","Problem sending command");
 		exit(1);
 	}
-
+	char b = '\0';
+	int n = write(sockfd, &b, sizeof(b));
 	printf("%s\n", "command sent");
 }
 
 
+bool Client::verifyUser(string& comparisonString)
+{
 
+	return readCommandFromServer() == comparisonString;
 
+}
 
+bool Client::checkIfAllowed(string& username, string& fileName)
+{
+	writeCommand(username);
+	writeCommand(fileName);
+	return verifyUser("Allowed");
+
+}
 
 
