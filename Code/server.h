@@ -19,8 +19,12 @@
 #include <sys/poll.h>
 #include <fstream>
 #include <dirent.h> 
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+#include <resolv.h>
+#include <netdb.h>
 #include <set>
-
+//#include "LoginDb.h"
 
 using namespace std;
 
@@ -31,28 +35,49 @@ using namespace std;
 #define LOGIN "login"
 #define DELETE "delete"
 #define DELIMITER '\0'
+#define MAINTABLE "UserTable"
 
 class Server{
 private:
 
 	//set<User* > Users;
 	sockaddr_in addr, cl_addr;
+	//UserLoginDb userdb;
+	
 	/* Do unit testing */
-	void sendFilename(char* fName, int sd);
-	void fileTransfer(int fd, int sockfd);
-	void readData(int);
-
-
-	void SendData(int, char* );
-	void ReceiveData(int);	
-	void buildSets();//
-	void populate(User&, const char*);//
+	void sendFilename(char*, int, SSL*);
+	void fileTransfer(int, int, SSL*);
+	void readData(int, SSL*);
+	string readCommand(int, SSL*);
+	void writeCommand(int, SSL*, char*);
+	string fileName(int, SSL*);
+	void uploadData(int, SSL*);
+	void SendData(int, SSL*, char* );
+	void ReceiveData(int, SSL*);	
+	void downloadData(int, SSL*);
+	void registerUser(int, SSL*);
+	void loginUser(int, SSL*);
+	void deleteUser(int, SSL*);
+	// void buildSets();//
+// 	void populate(User&, const char*);//
+	SSL_CTX* InitServerCTX();
+	void LoadCertificates(SSL_CTX*, char*, char*);	
 
 public:
 
-	void ChildProcess(int, int); // Handle a client when a connection is made
-	void CreateServer(char*, int); // main 	
-
+	void ChildProcess(int, int, SSL*); // Handle a client when a connection is made
+	void CreateServer(int); // main 	
+	Server()
+	{
+		/*
+		userdb.create(MAINTABLE);
+		*/
+	}
+	
+	~Server()
+	{
+		userdb.close();
+	}
 
 };
 

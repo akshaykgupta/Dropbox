@@ -17,6 +17,9 @@
 #include <netdb.h>
 #include <sys/poll.h>
 #include <sys/stat.h>
+#include <resolv.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 #include <fcntl.h>  
 
 #define DELIMITER '\0'
@@ -27,19 +30,24 @@ class Client{
 
 private:
 
-	struct sockaddr_in addr, cl_addr; 
+	sockaddr_in addr, cl_addr; 
 	int sockfd;
-	bool exec, connected;
+	SSL *ssl;
+	bool exec,connected;
 	void sendFilename(char*);
 	void fileTransfer(int);
 	void readFile();
-
+	void fileTransfer(ifstream&);
+	
+	SSL_CTX* InitCTX();
+	void ShowCerts();
 
 
 public:
 
 	
     Client() {
+	exec = true;
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sockfd < 0)
 		exec = false;
@@ -50,9 +58,11 @@ public:
 	void readFromServer();
 	void writeToServer(char* );  // file Name
 	void writeCommand(char *); // write a char* to the server
- 	bool verifyUser(); // TODO
- 	void readCommandFromServer();
+	string readCommand();
+ 	bool verifyUser(string ); // TODO
+ 	string readCommandFromServer();
  	bool checkIfAllowed(string&, string&);
+ 	char* stringToChar(string s);
 };
 
 #endif
