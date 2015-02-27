@@ -1,10 +1,11 @@
 #include "middleEnd.h"
 
-bool middleEnd::Register(string& username, string& password)
+bool middleEnd::Register(string& username, string& password, string& name)
 {
 	c->writeCommand("register");
 	c->writeCommand(username);
 	c->writeCommand(password);
+	c->writeCommand(name);
 	return c->verifyUser("Successful");
 
 }
@@ -37,11 +38,11 @@ void middleEnd::download(string& username, string& fileName)
 }
 
 
-void middleEnd::upload(string& username ,string& fileName)
+void middleEnd::upload(string& username, string& fileName)
 {
 	c->writeCommand("upload");
 	c->writeCommand(username);
-	c->writeToServer(fileName);
+	c->writeCommand(fileName);
 	// make changes to u?
 }
 
@@ -56,10 +57,17 @@ void middleEnd::share(string& fileName, string& uA, string& uB)
 	/* share file between user a and user b */
 }
 
-void middleEnd::Delete(string& username, string& fileName)
+void middleEnd::deleteFile(string& username, string& fileName)
 {
 	c->writeCommand("delete");
 	c->writeCommand(username);
 	c->writeCommand(fileName);
 	/* delete file from client c */
+}
+
+void middleEnd::deleteUser(string& username, string& fileName)
+{
+	c->writeCommand("delete");
+	c->writeCommand(username);
+	/* delete user from client c */
 }

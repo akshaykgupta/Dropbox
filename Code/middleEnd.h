@@ -18,13 +18,13 @@ private:
 
 public:
 
-	void Register(Client&, string&, string&); // register a new User u
-	bool login(Client&, string&, string&);  // login? for the current user
-	void download(User&, Client& , string&); // download given file for the given user
-	void upload(Client&, string&); // upload current file for the given user
-	void share(User&, User& ,Client&, string&); // share current file between the 2 users
-	void Delete(User&, Client&, string&); // delete current file from the user's database
-
+	void Register(string&, string&, string&); // register a new User u
+	bool login(string&, string&);  // login? for the current user
+	void download(string&, string&); // download given file for the given user
+	void upload(string&, string&); // upload current file for the given user
+	void share(string&, string&, string&); // share current file between the 2 users
+	void deleteFile(string&, string&); // delete current file from the user's database
+	void deleteUser(string&);
 };
 
 
