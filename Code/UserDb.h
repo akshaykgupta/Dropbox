@@ -59,9 +59,13 @@ public:
     int getFilesAndPathForFolder(string name,string version,vector<pair<string,string> > &results);
 	int getPermissionGivenPathAndSharee(string& perm,string Path,string Sharee);
 	int getAllPathsShareePermissions(vector<tpl> &);
-	int removeSharedFromOwned(string shareID,string path);
+	int removeSharedFromOwned(string shareID,string path = "");
 	int pathToLatestVersion(string path,string &version);
 	int getAllPathsAndLatestVersion(vector<pair<string,string> > & paths);
+	int getSharedUsersList(vector<string>& results);
+	int getOwnersList(vector<string> & results);
+	int removeOwnerFromShared(string owner);
+	int removeFromOwnedFolder(string fname, string ver="");
 };
 
 #endif /* defined(__DatabasePerUser__UserDb__) */

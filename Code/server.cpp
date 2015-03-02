@@ -531,7 +531,23 @@ void Server::loginUser(int newsockfd, SSL *ssl)
 void Server::deleteUser(int newsockfd, SSL *ssl)
 {
 	string username = readCommand(newsockfd, ssl);
+	vector<string> owners;
+	vector<string> shared;
+	UserUtilDb userdb(username);
+	userdb.getOwnersList(owners);
+	userdb.getSharedUsersList(shared);
 	int worked = logindb.delUser(username);
+	userdb.removeUser();
+	for(int i = 0; i < shared.size(); i++)
+	{
+		UserUtilDb userdb1(shared[i]);
+		userdb1.removeSharedFromOwned(username);
+	}
+	for(int i = 0; i < owners.size(); i++)
+	{
+		UserUtilDb userdb1(shared[i]);
+		userdb1.removeOwnerFromShared(username);
+	}
 	string Path = rootDir;
 	Path += username;
 	remove_all(path(Path));
@@ -690,7 +706,14 @@ void Server::deleteFile(int newsockfd, SSL *ssl)
 	string username = readCommand(newsockfd, ssl);
 	string fileName = readCommand(newsockfd, ssl);
 	UserUtilDb userdb(username);
-	//userdb.delUser(username);
+	vector<string> shared;
+	userdb.getSharedUsersList(shared);
+	for(int i = 0; i < shared.size(); i++)
+	{
+		UserUtilDb userdb1(shared[i]);
+		userdb1.removeFromShared(username, fileName);
+	}
+	userdb.removeFromOwnedFolder(fileName);
 	string Path = rootDir;
 	Path += fileName;
 	remove_all(path(Path));

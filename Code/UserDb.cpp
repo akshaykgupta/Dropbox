@@ -566,5 +566,91 @@ int UserUtilDb::getAllPathsAndLatestVersion(vector<pair<string,string> > & paths
 		return 0;
 	else
 		return 1;
-	
 }
+
+int UserUtilDb::getSharedUsersList(vector<string>& results)
+{
+    string expr = "SELECT DISTINCT SHAREDUSR FROM "+userTableOwned+";";
+    char* Cexpr = stringToChar(expr);
+    char* zErrorMsg=0;
+    int result=  sqlite3_exec(Database, Cexpr, callgetAllFilesOwned,(void*)&results, &zErrorMsg);
+    if(result==SQLITE_OK)
+        return 1;
+    else
+        return 0;
+}
+
+int UserUtilDb::getOwnersList(vector<string> & results)
+{
+    string expr = "SELECT DISTINCT OWNERS FROM "+userTableOwned+";";
+    char* Cexpr = stringToChar(expr);
+    char* zErrorMsg=0;
+    int result=  sqlite3_exec(Database, Cexpr, callgetAllFilesOwned,(void*)&results, &zErrorMsg);
+    if(result==SQLITE_OK)
+        return 1;
+    else
+        return 0;
+}
+
+int UserUtilDb::removeOwnerFromShared(string owner)
+{
+    convertToDatabaseString(owner);
+    string expr = "DELETE FROM "+userTableShared+" WHERE OWNERS="+owner+";";
+    char* Cexpr = stringToChar(Cexpr);
+    char* zErrorMsg = 0;
+    int result = sqlite3_exec(Database, Cexpr, callback,0, &zErrorMsg);
+    if(result==SQLITE_OK)
+        return 1;
+    else
+        return 0;
+}
+
+
+int UserUtilDb::removeFromOwnedFolder(string fname, string Ver)
+{
+    string expr;
+    char* Cexpr;
+    string tmpVer=Ver;
+	string temp = fname;
+	temp += "%";
+    if(Ver!="")
+    {
+        convertToDatabaseString(fname);
+        convertToDatabaseString(Ver);
+        expr = "SELECT COUNT(*) FROM "+userTableOwned+" WHERE PATH="+fname+" AND VERSIONS="+Ver+";";
+        Cexpr = stringToChar(expr);
+    }
+    else
+    {
+        convertToDatabaseString(fname);
+        expr = "SELECT COUNT(*) FROM "+userTableOwned+" WHERE PATH="+fname+";";
+        Cexpr = stringToChar(expr);
+    }
+    char* zErrorMsg= 0;
+    bool data = false;
+    int result = sqlite3_exec(Database, Cexpr, callCreated,(void*)&data, &zErrorMsg);
+    if(result!=SQLITE_OK)
+        return 0;
+    else
+        if(data==false)
+            return 0;
+    if(tmpVer=="")
+    {
+        convertToDatabaseString(temp);
+        expr = "DELETE FROM "+userTableOwned+" WHERE PATH LIKE"+temp+";";
+        Cexpr = stringToChar(expr);
+    }
+    else
+    {
+        convertToDatabaseString(temp);
+        expr = "DELETE FROM "+userTableOwned+" WHERE PATH LIKE"+temp+" AND VERSIONS="+Ver+";";
+        Cexpr = stringToChar(expr);
+    }
+        zErrorMsg = 0;
+        result = sqlite3_exec(Database, Cexpr, callback, 0, &zErrorMsg);
+    if(result ==SQLITE_OK)
+        return 1;
+    else
+        return 0;
+}
+
