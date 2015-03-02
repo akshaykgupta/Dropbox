@@ -1,4 +1,7 @@
 \documentclass[]{article}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
 \newcommand{\ty}[1]{\texttt{#1}}
 \begin{document}
 
@@ -16,6 +19,23 @@ When a user opens the MyDropbox App, he sees a Login/Register page. If he clicks
 After login, the user sees a list of directories and files which he owns or has access to. These are in two sections - the files currently on the user's system and the ones on the server. Internally the file system is a QTTreeWidget. The files on the system have an upload button. This button sends a request to the client middle end with the file path and the file is uploaded to the server. The files in the server section have a download button. Clicking this sends a download request to the middle end with the name of the file and the file is downloaded. While upload/download is under way, a progress bar is shown to the user. There is also an option to delete files that the user owns.
 \subsection{Sharing}The user has a share list which shows the files that have been shared with him by other users and the files he has shared with other users. When he wants to share a file with another user he specifies the user's username and then clicks share. He can then set the access permissions to read-only or read/write.
 \subsection{Syncing}When the user clicks sync all the files that are currently being edited by the user get uploaded to the server. Moreover, when the user clicks on logout, he is asked whether he wants to sync his changed files. He can thus leave his work on one machine and resume working on another machine.
+\begin{figure}
+\hspace*{-1.2in}
+\begin{subfigure}{.5\textwidth}
+ \noindent\makebox[\textwidth]{%
+ \includegraphics[width=0.7\linewidth]{login}}
+  \caption{Login Screen}
+  \label{fig:sub1}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=1.8\linewidth]{screen}
+  \caption{Main Screen}
+  \label{fig:sub2}
+\end{subfigure}
+\caption{User Interface}
+\label{fig:test}
+\end{figure}
 \section{Server Backend}
 We have a class called \ty{Server} which handles the server backend. It contains four primary functions:
 \begin{itemize}

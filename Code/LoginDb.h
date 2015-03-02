@@ -15,9 +15,13 @@
 #include <vector>
 #include <sqlite3.h>
 #include <iostream>
+#include <vector>
 #include <stdlib.h>
 #define DATABASE_NAME "Parent.db"
 using namespace std;
+/*
+ TODO: make column PATHSERVER
+ */
 class UserLoginDb
 {
 private:
@@ -27,14 +31,22 @@ private:
     string tableName;
     void convertToDatabaseString(string&);
     int exists(string); //0:DB Error 1:Exists 2:Does not Exist
-    bool open();
+	
+	// static int callCreated(void *data,int argc,char **argv,char **azColName);
+// 	static int callexists(void *data,int argc,char **argv,char **azColName);
+// 	static int callback(void* data,int argc,char **argv,char **azColName);
+// 	static int callpassCheck(void *data,int argc,char **argv,char **azColName);
+// 	static int callSearch(void* data,int argc,char** argv,char** azColName);
+	
 public:
-    int create(string); //0 DB ERROR NOT CREATED 1:CREATED
-    int addUser(string,string,string); // 0 for database not connected, 1 for Username already taken, 2 for success
+    bool open();
+    int create(); //0 DB ERROR NOT CREATED 1:CREATED
+    int addUser(string,string,string,string); // 0 for database not connected, 1 for Username already taken, 2 for success
     int delUser(string); // 0:DB Error 1:Failure 2:Success
-    int passCheck(string,string); //0:DB Error 1:Fail 2:Pass
+    int passCheck(string , string, string&); //0:DB Error 1:Fail 2:Pass
     void close();
-    UserLoginDb();
-    
+    int Usersquery(string,vector<string>&); //Gives names of 20 people starting with Username
+    UserLoginDb(string);
+    int getUserLocalDir(string,string&); // Gives local dir of given username 
 };
 #endif /* defined(__Database_final__LoginDb__) */

@@ -14,11 +14,6 @@ void Server::sendFilename(char* fileName, int sd, SSL *ssl)
 
 void Server::fileTransfer(int fd, int sockfd, SSL *ssl)
 {
-	if (!connected){
-		printf("%s\n", "Not connected to server");
-		exit(1);
-	}	
-
 	int BUF_SIZE = 10000;
 	char buffer[BUF_SIZE];
 	int bytesread, ret,rv,byteswrite;
@@ -100,13 +95,8 @@ string Server::readCommand(int newsockfd, SSL *ssl)
 	return s;
 }
 
-void Server::writeCommand(char* a, int newsockfd, SSL* ssl)
+void Server::writeCommand(int newsockfd, SSL* ssl, char* a)
 {
-	if (!connected) {
-		printf("%s\n","not connected to server");
-		exit(1);
-	}
-
 	int n = strlen(a);
 	//int written = write(sockfd, a, n);
 	int written = SSL_write(ssl, a, n);
@@ -121,45 +111,30 @@ void Server::writeCommand(char* a, int newsockfd, SSL* ssl)
 	printf("%s\n", "command sent");
 }
 
-// void Server::uploadData(int newsockfd)
-// {
-// 	ofstream f;
-//
-// 	int BUF_SIZE = 1024;
-// 	int rv;
-//
-// 	char buffer[BUF_SIZE];
-// 	memset(buffer, 0, BUF_SIZE);
-// 	string s = fileName(newsockfd);
-// 	f.open(s, ios::out);
-// 	while ((rv = read(newsockfd, buffer, BUF_SIZE)) != 0)
-// 	{
-// 		if(buffer[0] == '\0')
-// 			break;
-// 		cout<<strlen(buffer)<<"\n";
-// 		f.write(buffer, strlen(buffer));
-// 		memset(buffer, 0, BUF_SIZE);
-// 	}
-//
-// 	f.close();
-//
-// 	// Handle version control, and change user info
-//
-//
-// }
-
-void Server::uploadData(int newsockfd, SSL *ssl)
+void Server::writeCommand(int newsockfd, SSL* ssl, string& s)
 {
-	ofstream f;
+	char *a = stringToChar(s);
+	int n = strlen(a);
+	//int written = write(sockfd, a, n);
+	int written = SSL_write(ssl, a, n);
+	if (written < 0)
+	{
+		printf("%s\n","Problem sending command");
+		exit(1);
+	}
+	char b = DELIMITER;
+	//n = write(sockfd, &b, sizeof(b));
+	n = SSL_write(ssl, &b, sizeof(b));
+	printf("%s\n", "command sent");
+	delete[] a;
+}
 
+void Server::getFile(int newsockfd, SSL *ssl, ofstream& f, long int size )
+{
 	int BUF_SIZE = 10000;
 	int r, rv, ret;
 
 	char buffer[BUF_SIZE];
-	string s = fileName(newsockfd, ssl);
-	f.open(s, ios::out);
-	string sizefile = readCommand(newsockfd, ssl);
-	long int size = stol(sizefile);
 	// pollfd pf;
 	// pf.fd = newsockfd;
 	// pf.events = POLLIN;
@@ -174,7 +149,7 @@ void Server::uploadData(int newsockfd, SSL *ssl)
 			{
 				if (buffer[BUF_SIZE-1] == '1')
 				{
-					cout<<"read!!!!!!!!!\n\n\n\n\n\n\n";
+					cout<<"read!!!!\n";
 					f.write(buffer, size - byteswritten);
 					byteswritten += size - byteswritten;
 					memset(buffer, 0, BUF_SIZE);
@@ -184,6 +159,7 @@ void Server::uploadData(int newsockfd, SSL *ssl)
 					ret = SSL_write(ssl, buffer, BUF_SIZE);
 					break;
 				}
+				//cout << buffer <<" ";
 				byteswritten += BUF_SIZE-1;
 				f.write(buffer, BUF_SIZE-1);
 				memset(buffer, 0, BUF_SIZE);
@@ -202,172 +178,614 @@ void Server::uploadData(int newsockfd, SSL *ssl)
 	}
 
 	f.close();
-	// char stuff[120];
-	// stuff[0] = '\0';
-	// strcat(stuff, "mv experiment.txt ");
-	// strcat(stuff, s.c_str());
-	// cout<<stuff<<"\n";
-	// system(stuff);
 	// Handle version control, and change user info
-
-
 }
 
-void downloadData(int newsockfd, SSL *ssl)
+void Server::uploadFile(int newsockfd, SSL *ssl)
+{
+	string user = readCommand(newsockfd, ssl);
+	string version = readCommand(newsockfd, ssl);
+	string Pathname = readCommand(newsockfd, ssl);
+	string sizefile = readCommand(newsockfd, ssl);
+	path p(Pathname);
+	string Path = user;
+	string name = p.filename().string();
+	Path += "/";
+	Path += name;
+	long int size = stol(sizefile);
+	UserUtilDb db(user);
+	string sharePath;
+	string permission;
+	db.getFileFromShared(name, sharePath, permission);
+	if(sharePath == "")
+	{
+		int worked = db.addToTableOwned(name, version, "FILE", Path);
+		cout<<worked<<"\n";
+		if(worked)
+		{
+			writeCommand(newsockfd, ssl, "continue");
+			ofstream f;
+			string s = rootDir;
+			s += Path;
+			s += "_";
+			s += version;
+			f.open(s, ios::out);
+			getFile(newsockfd, ssl, f, size);
+		}
+		if(!worked)
+		{
+			writeCommand(newsockfd, ssl, "discontinue");
+		}
+	}
+	else
+	{
+		if(permission == "r")
+		{
+			writeCommand(newsockfd, ssl, "disallowed");
+		}
+		else if(permission == "w")
+		{
+			ofstream f;
+			string s = rootDir;
+			s += "/";
+			s += sharePath;
+			s += "_";
+			s += version;
+			f.open(s, ios::out);
+			getFile(newsockfd, ssl, f, size);
+		}
+	}	
+}
+
+void Server::uploadFolder(int newsockfd, SSL *ssl)
+{
+	string user = readCommand(newsockfd, ssl);
+	string version = readCommand(newsockfd, ssl);
+	while(true)
+	{
+		string type = readCommand(newsockfd, ssl);
+		if(type == "Done")
+			break;
+		else if(type == "File")
+		{
+			string Pathname = readCommand(newsockfd, ssl);
+			string sizefile = readCommand(newsockfd, ssl);
+			path p(Pathname);
+			string Path = user;
+			Path += "/";
+			Path += p.string();
+			string name = p.filename().string();
+			long int size = stol(sizefile);
+			UserUtilDb db(user);
+			string sharePath;
+			string permission;
+			db.getFileFromShared(name, sharePath, permission);
+			if(sharePath == "")
+			{
+				int worked = db.addToTableOwned(name, version, "FILE", Path);
+				cout<<worked<<"\n";
+				if(worked)
+				{
+					writeCommand(newsockfd, ssl, "continue");
+					ofstream f;
+					string s = rootDir;
+					s += Path;
+					s += "_";
+					s += version;
+					f.open(s, ios::out);
+					getFile(newsockfd, ssl, f, size);
+				}
+				if(!worked)
+				{
+					writeCommand(newsockfd, ssl, "discontinue");
+				}
+			}
+			else
+			{
+				if(permission == "r")
+				{
+					writeCommand(newsockfd, ssl, "disallowed");
+				}
+				else if(permission == "w")
+				{
+					ofstream f;
+					string s = rootDir;
+					s += sharePath;
+					s += "_";
+					s += version;
+					f.open(s, ios::out);
+					getFile(newsockfd, ssl, f, size);
+				}
+			}
+		}
+		else if(type == "Folder")
+		{
+			string Pathname = readCommand(newsockfd, ssl);
+			string Path = user;
+			path p(Pathname);
+			Path += "/";
+			Path += p.string();
+			Path += "/";
+			cout << Path << "\n";
+			string name = p.filename().string();
+			UserUtilDb db(user);
+			string sharePath;
+			string permission;
+			int worked = db.addToTableOwned(name, version, "FOLDER", Path);
+			cout<<worked<<"\n";
+			if(worked)
+			{
+				string s = rootDir;
+				s += Path;
+				if(!exists(s))
+					create_directory(s);
+			}
+			if(!worked)
+			{
+				writeCommand(newsockfd, ssl, "discontinue");
+			}
+		}
+	}
+}
+
+void Server::downloadFile(int newsockfd, SSL *ssl)
 {
 	string username = readCommand(newsockfd, ssl);
-	string fileName = readCommand(newsockfd, ssl);
-	const char *a = fileName.c_str();
+	string Path = readCommand(newsockfd, ssl);
+	string version = readCommand(newsockfd, ssl);
+	string FullPath = rootDir;
+	FullPath += Path;
+	FullPath += "_";
+	FullPath += version;
+	const char *a = FullPath.c_str();
 	int fd = open(a, O_RDONLY);
 	if (fd < 0)
 	{
 		printf("%s\n","File IO error");
 		exit(1);
 	}
-	
 	long int pos = lseek(fd, 0L, SEEK_END);
 	char sizefile[64];
 	sprintf(sizefile, "%ld", pos);
 	cout<<sizefile<<"\n";
 	lseek(fd, 0, SEEK_SET);
-	writeCommand(sizefile, newsockfd, ssl);
+	writeCommand(newsockfd, ssl, sizefile);
 	fileTransfer(fd, newsockfd, ssl);
 }
 
-void Server
-
-string Server::fileName(int newsockfd, SSL *ssl)
+void Server::downloadFolder(int newsockfd, SSL *ssl)
 {
-	return readCommand(newsockfd, ssl);
+	string username = readCommand(newsockfd, ssl);
+	string folderName = readCommand(newsockfd, ssl);
+	string version = readCommand(newsockfd, ssl);
+	string Path;
+	UserUtilDb userdb(username);
+	vector< pair<string, string> > filePaths;
+	userdb.getFilesAndPathForFolderPath(folderName, version, filePaths);
+	for(int i = 0; i < filePaths.size(); i++)
+	{
+		string FullPath = rootDir;
+		FullPath += filePaths[i].second;
+		FullPath += "_";
+		FullPath += version;
+		const char *a = FullPath.c_str();
+		int fd = open(a, O_RDONLY);
+		if (fd < 0)
+		{
+			printf("%s\n","File IO error");
+			exit(1);
+		}
+		long int pos = lseek(fd, 0L, SEEK_END);
+		char sizefile[64];
+		sprintf(sizefile, "%ld", pos);
+		cout<<sizefile<<"\n";
+		lseek(fd, 0, SEEK_SET);
+		writeCommand(newsockfd, ssl, filePaths[i].second);
+		writeCommand(newsockfd, ssl, sizefile);
+		fileTransfer(fd, newsockfd, ssl);
+	}
+	writeCommand(newsockfd, ssl, "Done");
 }
 
-string Server::registerUser(int newsockfd, SSL *ssl)
+void Server::shareData(int newsockfd, SSL* ssl)
+{
+	string username = readCommand(newsockfd, ssl);
+	vector<string> files;
+	while(true)
+	{
+		string file = readCommand(newsockfd, ssl);
+		if(file == "Done")
+			break;
+		files.push_back(file);
+	}
+	while(true)
+	{
+		string user = readCommand(newsockfd, ssl);
+		if(user == "Done")
+			break;
+		string perm = readCommand(newsockfd, ssl);
+		UserUtilDb userdb(user);
+		string Path;
+		UserUtilDb userdb1(username);
+		for(int i = 0; i < files.size(); i++)
+		{
+			userdb1.getPathGivenFile(files[i], Path);
+			string version;
+			userdb1.pathToLatestVersion(Path, version);
+			userdb1.addToTableOwned(files[i], version, "FILE", Path, user);
+			userdb.addToTableShared(files[i], username, perm, "FILE", Path);
+		}
+	}
+}
+
+void Server::unshareData(int newsockfd, SSL *ssl)
+{
+	string owner = readCommand(newsockfd, ssl);
+	string user = readCommand(newsockfd, ssl);
+	string file = readCommand(newsockfd, ssl);
+	UserUtilDb userdb(user);
+	userdb.removeFromShared(file, owner);
+	UserUtilDb userdb1(owner);
+	string Path;
+	userdb1.getPathGivenFile(file, Path);
+	userdb.removeSharedFromOwned(user, Path);
+}
+
+void Server::downloadSharedFile(int newsockfd, SSL* ssl)
+{
+	string user = readCommand(newsockfd, ssl);
+	string owner = readCommand(newsockfd, ssl);
+	string fileName = readCommand(newsockfd, ssl);
+	UserUtilDb userdb(owner);
+	string Path;
+	userdb.getPathGivenFile(fileName, Path);
+	string version;
+	userdb.pathToLatestVersion(Path, version);
+	string fullPath = rootDir;
+	fullPath += Path;
+	fullPath += "_";
+	fullPath += version;
+	const char *a = fullPath.c_str();
+	int fd = open(a, O_RDONLY);
+	if (fd < 0)
+	{
+		printf("%s\n","File IO error");
+		exit(1);
+	}
+	long int pos = lseek(fd, 0L, SEEK_END);
+	char sizefile[64];
+	sprintf(sizefile, "%ld", pos);
+	cout<<sizefile<<"\n";
+	lseek(fd, 0, SEEK_SET);
+	writeCommand(newsockfd, ssl, sizefile);
+	fileTransfer(fd, newsockfd, ssl);
+	
+}
+
+void Server::registerUser(int newsockfd, SSL *ssl)
 {
 	string username = readCommand(newsockfd, ssl);
 	string password = readCommand(newsockfd, ssl);
 	string name = readCommand(newsockfd, ssl);
-	/*
-	int worked = userdb.addUser(username, name, password);
+	string localPath = "";
+	int worked = 2;
+	worked = logindb.addUser(username, name, password, localPath);
 	if(worked == 0)
+	{
 		cout<<"DB error :(\n";
+		writeCommand(newsockfd, ssl, "Invalid");
+	}
 	else if(worked == 1)
-		writeCommand("Unsuccessful");
+		writeCommand(newsockfd, ssl, "Unsuccessful");
 	else if(worked == 2)
-		writeCommand("Successful");
-	*/
+	{
+		UserUtilDb newUserDb(username);
+	    int worked1 = newUserDb.createOwned(); //0:NOT CREATED 1:CREATED
+	    int worked2 = newUserDb.createShared(); //0:NOT CREATED 1:CREATED
+		if(worked1 && worked2)
+		{
+			string s = rootDir;
+			s += username;
+			path p(s);
+			create_directories(p);
+			writeCommand(newsockfd, ssl, "Successful");
+		}
+		else
+		{
+			cout<<"DB error :(\n";
+			writeCommand(newsockfd, ssl, "Invalid");
+		}
+	}
 }
 
 void Server::loginUser(int newsockfd, SSL *ssl)
 {
 	string username = readCommand(newsockfd, ssl);
 	string password = readCommand(newsockfd, ssl);
-	/*
-	int worked = userdb.passCheck(username, password);
+	int worked = 2;
+	string name;
+	worked = logindb.passCheck(username, password, name);
 	if(worked == 0)
-		cout<<"DB error:(\n";
+	{
+		cout<<"DB error :(\n";
+		writeCommand(newsockfd, ssl, "Invalid");
+	}
 	else if(worked == 1)
-		writeCommand("Invalid");
+		writeCommand(newsockfd, ssl, "Invalid");
 	else if(worked == 2)
-		writeCommand("Valid");
-	*/
+	{
+		UserUtilDb userdb(username);
+		vector< pair<string, string> > filesAndVersions;
+		userdb.getAllPathandVersions(filesAndVersions);
+		writeCommand(newsockfd, ssl, "Valid");
+		writeCommand(newsockfd, ssl, name);
+		for(int i = 0; i < filesAndVersions.size(); i++)
+		{
+			writeCommand(newsockfd, ssl, filesAndVersions[i].first);
+			writeCommand(newsockfd, ssl, filesAndVersions[i].second);
+		}
+		writeCommand(newsockfd, ssl, "Done");
+	}
 }
 
 void Server::deleteUser(int newsockfd, SSL *ssl)
 {
 	string username = readCommand(newsockfd, ssl);
-	/*
-	int worked = delUser(username);
-	*/
+	int worked = logindb.delUser(username);
+	string Path = rootDir;
+	Path += username;
+	remove_all(path(Path));
 }
 
-void Server::readData(int newsockfd, SSL *ssl)
+void Server::searchUsers(int newsockfd, SSL* ssl)
+{
+	string searchTerm = readCommand(newsockfd, ssl);
+	vector<string> listOfUsers;
+	int worked = logindb.Usersquery(searchTerm, listOfUsers);
+	if(worked == 0)
+	{
+		cout<<"DB error :(\n";
+		writeCommand(newsockfd, ssl, "Done");
+	}
+	else
+	{
+		for(int i = 0; i < listOfUsers.size(); i++)
+		{
+			writeCommand(newsockfd, ssl, listOfUsers[i]);
+		}
+		writeCommand(newsockfd, ssl, "Done");
+	}
+}
+
+void Server::changePermissions(int newsockfd, SSL* ssl)
+{
+	string owner = readCommand(newsockfd, ssl);
+	string sharee = readCommand(newsockfd, ssl);
+	string fileName = readCommand(newsockfd, ssl);
+	string perm = readCommand(newsockfd, ssl);
+	UserUtilDb userdb(sharee);
+	UserUtilDb userdb1(owner);
+	string Path;
+	userdb1.getPathGivenFile(fileName, Path);
+	cout << Path << " ";
+	userdb.addToTableShared(fileName, owner, perm, "FILE", Path);
+}
+
+void Server::sendSharedFiles(int newsockfd, SSL* ssl)
+{
+	string user = readCommand(newsockfd, ssl);
+	UserUtilDb userdb(user);
+	vector<tpl> sharedFiles;
+	userdb.getAllPathsShareePermissions(sharedFiles);
+	string currentUser = "";
+	for(int i = 0; i < sharedFiles.size(); i++)
+	{
+		cout << sharedFiles[i].first <<"\n";
+		cout << sharedFiles[i].second <<"\n";
+		cout << sharedFiles[i].third <<"\n";
+		if(sharedFiles[i].second != currentUser)
+		{
+			writeCommand(newsockfd, ssl, "New");
+			writeCommand(newsockfd, ssl, sharedFiles[i].second);
+			currentUser = sharedFiles[i].second;
+			writeCommand(newsockfd, ssl, sharedFiles[i].first);
+			writeCommand(newsockfd, ssl, sharedFiles[i].third);
+		}
+		else
+		{
+			writeCommand(newsockfd, ssl, sharedFiles[i].first);
+			writeCommand(newsockfd, ssl, sharedFiles[i].third);
+		}
+	}
+	writeCommand(newsockfd, ssl, "Done");
+	vector<pair<string, string> > shareList;
+	userdb.getAllPathsSharedandOwners(shareList);
+	currentUser = "";
+	for(int i = 0; i < shareList.size(); i++)
+	{
+		cout << shareList[i].first <<"\n";
+		cout << shareList[i].second <<"\n";
+		if(shareList[i].second != currentUser)
+		{
+			writeCommand(newsockfd, ssl, "New");
+			writeCommand(newsockfd, ssl, shareList[i].second);
+			currentUser = shareList[i].second;
+			writeCommand(newsockfd, ssl, sharedFiles[i].first);
+		}
+		else
+			writeCommand(newsockfd, ssl, shareList[i].first);
+	}
+	writeCommand(newsockfd, ssl, "Done");
+}
+
+void Server::syncFiles(int newsockfd, SSL *ssl)
+{
+	string username = readCommand(newsockfd, ssl);
+	UserUtilDb userdb(username);
+	vector< pair<string, string> > fileNames;
+	userdb.getAllPathsAndLatestVersion(fileNames);
+	for(int i = 0; i < fileNames.size(); i++)
+	{
+		cout << fileNames[i].first <<"\n";
+		cout << fileNames[i].second << "\n";
+		writeCommand(newsockfd, ssl, fileNames[i].first);
+		writeCommand(newsockfd, ssl, fileNames[i].second);
+		if(fileNames[i].first.back() == '/')
+		{
+			string change = readCommand(newsockfd, ssl);
+			if(change == "upload")
+			{
+				string version = readCommand(newsockfd, ssl);
+				string name = path(fileNames[i].first).filename().string();
+				userdb.addToTableOwned(name, version, "FOLDER", fileNames[i].first);
+			}
+		}
+		else
+		{
+			string change = readCommand(newsockfd, ssl);
+			if(change == "upload")
+			{
+				string version = readCommand(newsockfd, ssl);
+				string name = path(fileNames[i].first).filename().string();
+				userdb.addToTableOwned(name, version, "FILE", fileNames[i].first);
+				string fullPath = rootDir;
+				fullPath += fileNames[i].first;
+				fullPath += "_";
+				fullPath += version;
+				ofstream f;
+				f.open(fullPath, ios::out);
+				string sizefile = readCommand(newsockfd, ssl);
+				long int size = stol(sizefile);
+				getFile(newsockfd, ssl, f, size);
+				
+			}
+			else if(change == "download")
+			{
+				string fullPath = rootDir;
+				fullPath += fileNames[i].first;
+				fullPath += "_";
+				fullPath += fileNames[i].second;
+				const char *a = fullPath.c_str();
+				int fd = open(a, O_RDONLY);
+				if (fd < 0)
+				{
+					printf("%s\n","File IO error");
+					exit(1);
+				}
+				long int pos = lseek(fd, 0L, SEEK_END);
+				char sizefile[64];
+				sprintf(sizefile, "%ld", pos);
+				cout<<sizefile<<"\n";
+				lseek(fd, 0, SEEK_SET);
+				writeCommand(newsockfd, ssl, sizefile);
+				fileTransfer(fd, newsockfd, ssl);
+			}
+		}
+	}
+	writeCommand(newsockfd, ssl, "Done");
+}
+
+void Server::deleteFile(int newsockfd, SSL *ssl)
+{
+	string username = readCommand(newsockfd, ssl);
+	string fileName = readCommand(newsockfd, ssl);
+	UserUtilDb userdb(username);
+	//userdb.delUser(username);
+	string Path = rootDir;
+	Path += fileName;
+	remove_all(path(Path));
+}
+
+bool Server::readData(int newsockfd, SSL *ssl)
 {
 
 	string command = readCommand(newsockfd, ssl);
-	if (command == DOWNLOAD)
+	if (command == DOWNLOADFILE)
 	{
-		cout<<"AOK";
-		//downloadData(newsockfd);
-	}
-
-	if (command == SHARE)
-	{
-		//shareData(newsockfd);
-		cout<<"AOK";
-	}
-
-
-	if (command == UPLOAD)
-	{
-		uploadData(newsockfd, ssl);
-		cout<<"AOK\n";
+		downloadFile(newsockfd, ssl);
 	}
 	
-	if (command == REGISTER)
+	else if (command == DOWNLOADFOLDER)
+	{
+		downloadFolder(newsockfd, ssl);
+	}
+
+	else if (command == SHARE)
+	{
+		shareData(newsockfd, ssl);
+	}
+
+	else if(command == UNSHARE)
+	{
+		unshareData(newsockfd, ssl);
+	}
+
+	else if (command == UPLOADFILE)
+	{
+		uploadFile(newsockfd, ssl);
+		
+	}
+	
+	else if (command == UPLOADFOLDER)
+	{
+		uploadFolder(newsockfd, ssl);
+		
+	}
+	
+	else if (command == REGISTER)
 	{
 		registerUser(newsockfd, ssl);
+		
 	}
 	
-	if (command == LOGIN)
+	else if (command == LOGIN)
 	{
 		loginUser(newsockfd, ssl);
 	}
 	
-	if (command == DELETE)
+	else if (command == DELETEFILE)
+	{
+		deleteFile(newsockfd, ssl);
+	}
+	
+	else if (command == DELETEUSER)
 	{
 		deleteUser(newsockfd, ssl);
 	}
 	
-/*	while ((bytesread = read(newsockfd, &name, sizeof(name) )) != 0)
+	else if(command == SEARCH)
 	{
-		if (name == DELIMITER) break;
-		fileName << name;
-
+		searchUsers(newsockfd, ssl);
 	}
-
-
-	f.open(fileName.str(),ios::out);
-
-	while ((rv = read(newsockfd, buffer, BUF_SIZE) ) != 0)   
-		f.write(buffer, BUF_SIZE);
 	
-
-	f.close();*/
+	else if(command == CHANGEPERMISSION)
+	{
+		changePermissions(newsockfd, ssl);
+	}
+	
+	else if(command == OPENSHARE)
+	{
+		sendSharedFiles(newsockfd, ssl);
+	}
+	
+	else if(command == DOWNLOADSHARED)
+	{
+		downloadSharedFile(newsockfd, ssl);
+	}
+	
+	else if(command == SYNC)
+	{
+		syncFiles(newsockfd, ssl);
+	}
+	
+	else if(command == CLOSE)
+	{
+		return false;
+	}
+	
+	return true;
 	
 }
-
-
-void Server::ReceiveData(int newsockfd, SSL *ssl){
-
-	bool interrupt = false;
-	int r, rv;
-
-	pollfd pf;
-	pf.fd = newsockfd;
-	pf.events = POLLIN;
-
-
-	do{
-
-	// rv = poll(&pf, 1, -1);
-	// if (rv == -1)
-	// 	perror("poll"); // error occurred in poll()
-	//
-	// if (pf.revents && POLLIN)
-		readData(newsockfd, ssl);
-
-
-
-		printf("%s\n", "Press 1 to continue receiving files");
-		scanf("%d",&r);
-		if (r == 1) interrupt = true;
-
-	} while (!interrupt);
-
-
-
-}
-
 
 void Server::SendData(int sockfd, SSL *ssl, char* a)
 {
@@ -385,7 +803,7 @@ void Server::SendData(int sockfd, SSL *ssl, char* a)
 	fileTransfer(fd, sockfd, ssl);
 
 	close(fd);
-
+	SSL_free(ssl);
 
 }
 
@@ -396,26 +814,12 @@ void Server::ChildProcess(int sockfd, int newsockfd, SSL *ssl)
 	close(sockfd);    
 	char* a;
 	int opt = 0;
- 	while (true){
- 		// printf("%s\n","press 1 to send file");
-//  		printf("%s\n","press 2 to receive files");
-//
-//  		while (opt != 0) scanf("%d",&opt);
-//
-//  		if (opt == 1)
-//  		{
-//  			printf("%s\n", "Enter file name to send");
-//  			scanf("%s",a);
-//  			SendData(newsockfd,a);
-//  		}
-  		//
- 		// if (opt == 2)
- 		// {
+	logindb.open();
+	logindb.create();
+	bool keepGoing = true;
+ 	while (keepGoing){
  			printf("%s\n","Receiving Data from client..");
- 			ReceiveData(newsockfd, ssl);
- 		// }
-
-
+ 			keepGoing = readData(newsockfd, ssl);
  	}
 
 
@@ -428,7 +832,7 @@ SSL_CTX* Server::InitServerCTX()
     SSL_CTX *ctx;
     OpenSSL_add_all_algorithms();		/* load & register all cryptos, etc. */
     SSL_load_error_strings();			/* load all error messages */
-    method = SSLv2_server_method();		/* create new server-method instance */
+    method = const_cast<SSL_METHOD *>(SSLv3_server_method());		/* create new server-method instance */
     ctx = SSL_CTX_new(method);			/* create new context from method */
     if ( ctx == NULL )
     {
@@ -485,66 +889,43 @@ void Server::CreateServer(int port)
 
 		ret = bind(sockfd, (struct sockaddr *) &addr, sizeof(addr));  // connect socket to server
 		listen(sockfd, 5);	// backlog queue for socket connection
-
 		while (true)
 		{
 			 len = sizeof(cl_addr);
-			 cout<<"hello\n"; 
 			 newsockfd = accept(sockfd, (struct sockaddr *) &cl_addr, (socklen_t*) &len); // create connection with a client
 
-			 if (newsockfd < 0){
-			 	printf("Error accepting connection!\n");  
-     			exit(1);  
-			 }
-			 SSL *ssl;
-			 inet_ntop(AF_INET, &(cl_addr.sin_addr), clientAddr, 100);
-	         ssl = SSL_new(ctx);         					/* get new SSL state with context */
-	         SSL_set_fd(ssl, newsockfd);						/* set connection socket to SSL state */
-			 if ((childpid = fork() ) == 0){
-			    if ( SSL_accept(ssl) == -1 )					/* do SSL-protocol accept */
-			         printf("Error accepting SSL connection!\n");
-			 	ChildProcess(sockfd, newsockfd, ssl);
-			 }
+			 if (newsockfd < 0) {
+     			exit(1);
+			}
+			else
+			{
+				SSL *ssl;
+				inet_ntop(AF_INET, &(cl_addr.sin_addr), clientAddr, 100);
+				ssl = SSL_new(ctx);         					/* get new SSL state with context */
+				SSL_set_fd(ssl, newsockfd);						/* set connection socket to SSL state */
+				if ((childpid = fork() ) == 0){
+					if ( SSL_accept(ssl) == -1 )					/* do SSL-protocol accept */
+						printf("Error accepting SSL connection!\n");
+					ChildProcess(sockfd, newsockfd, ssl);
+				}
+			}
 
 			 close(newsockfd);
-		}   
+		}
+		close(sockfd);
 }
 
-// void Server::populate(User& u, const char* path)
-// {
-// 	dir = opendir(path);
-//
-// }
-//
-// void Server::buildSets() {
-//     dirent *userEntry;
-//     DIR *dir;
-//     if ((dir = opendir(".") ) != NULL)     // system call to open directory
-// 	{
-// 		while ((userEntry = readdir (dir)) != NULL)   //system call to read file name from directory
-// 		{
-// 			//printf("\n%s",entry->d_name);
-// 			if(userEntry->d_type == DT_DIR)
-// 			{
-// 				string dirName(userEntry->d_name);
-// 				UserInfo i;
-// 				i.username = dirName;
-// 				//TODO set password
-// 				User u;
-// 				u.info = i;
-// 				dirent *files;
-// 				DIR *userDir;
-// 				char path[256];
-// 				strcat(path, "./");
-// 				strcat(path, userEntry->d_name);
-// 				populate(u, path);
-// 			}
-// 		}
-// 	}
-// 	else
-// 	{
-// 		cout << "Could not open directory.\n";
-// 	}
-// }
+char* Server::stringToChar(string &s)
+{
+	char* useless_conversions = new char[s.length()+1];
+	int i;
+	for(i = 0;i<s.length();i++)
+	{
+		useless_conversions[i] = s[i];
+	}
+
+	useless_conversions[i] = '\0';
+	return useless_conversions;
+}
 
 
