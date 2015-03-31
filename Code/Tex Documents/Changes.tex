@@ -1,0 +1,28 @@
+\documentclass[]{article}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\newcommand{\ty}[1]{\texttt{#1}}
+\begin{document}
+
+\title{COP 290 - Assignment 2\\MyDropbox App \\Changes}
+\author{Akshay Kumar Gupta\\ 2013CS50275 \and  Barun Patra\\{2013CS10773} \and J. Shikhar Murty\\{2013EE10462}}
+\date{}
+\maketitle
+\noindent We adopted the MVC paradigm where the model is the database, the controller is the middle end (talked about in the Design Document) and the view is the user interface.
+\section{Database}
+On the server end we have a database which contains the details of all the users including their username and password, the files they own along with the different versions, and the files they have shared and that have been shared with them, including permissions for the same. This makes for very fast queries and also makes the server end modular and efficient. We have used  the C++ api of sqlite3 for database handling. Some of the functions of the database are:
+\begin{itemize}
+\item \ty{addUser()} - Called during registration. Adds a user and his password to the database.
+\item \ty{passCheck()} - Checks whether the password is correct during login.
+\item \ty{addToTableOwned()} - Adds a file with its version and path to the table of the user.
+\item \ty{addToTableShared()} - Adds a file, its owner and its path to the share table of the user.
+\item \ty{getAllPathandVersions()} - Return all the file paths and versions of a user.
+\item \ty{getSharedUsersList()} - Returns a list of users a file has been shared with by the owner.
+\end{itemize}
+along with lots of other functions.
+\section{User Interface}
+We have a lot of GUI features which include having QTreeWidgets for showing the files on the user's system, the files on the server of that user, the files that the user has shared and the files that have been shared with the user. We also have different windows for sharing files and for viewing and downloading shared files.
+\section{Debugging}
+LLDB was used for extensive debugging.
+\end{document}
